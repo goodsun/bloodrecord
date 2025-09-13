@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bloodRecord</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        .input-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        label {
+            color: #666;
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 80px;
+        }
+        input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .records {
+            margin-top: 20px;
+        }
+        .records h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .record {
+            background: #f9f9f9;
+            padding: 8px 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            border-left: 3px solid #4CAF50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .record-date {
+            color: #666;
+            font-size: 12px;
+            min-width: 110px;
+        }
+        .record-values {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+            flex: 1;
+        }
+        .bp-value {
+            color: #2196F3;
+            font-weight: bold;
+        }
+        .pulse-value {
+            color: #FF5722;
+        }
+        .delete-btn {
+            background-color: transparent;
+            color: #999;
+            border: 1px solid #ddd;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+            width: fit-content;
+        }
+        .delete-btn:hover {
+            background-color: #f44336;
+            color: white;
+            border-color: #f44336;
+        }
+        .export-btn {
+            background-color: #2196F3;
+        }
+        .export-btn:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>bloodRecord</h1>
+        
+        <form id="bloodPressureForm">
+            <div class="input-group">
+                <label for="systolic">最高血圧</label>
+                <input type="number" id="systolic" required min="50" max="250" placeholder="mmHg">
+            </div>
+            
+            <div class="input-group">
+                <label for="diastolic">最低血圧</label>
+                <input type="number" id="diastolic" required min="30" max="150" placeholder="mmHg">
+            </div>
+            
+            <div class="input-group">
+                <label for="pulse">脈拍</label>
+                <input type="number" id="pulse" required min="30" max="200" placeholder="回/分">
+            </div>
+            
+            <div class="input-group">
+                <label for="datetime">日時</label>
+                <input type="datetime-local" id="datetime" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button type="submit" style="flex: 1;">記録する</button>
+                <button type="button" class="export-btn" onclick="exportData()" style="flex: 1;">エクスポート</button>
+            </div>
+        </form>
+        
+        <div class="records" id="recordsList">
+            <h2>記録履歴</h2>
+            <div id="recordsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+            
+            loadRecords();
+        });
+
+        document.getElementById('bloodPressureForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const systolic = document.getElementById('systolic').value;
+            const diastolic = document.getElementById('diastolic').value;
+            const pulse = document.getElementById('pulse').value;
+            const datetime = document.getElementById('datetime').value;
+            
+            const record = {
+                id: Date.now(),
+                systolic: parseInt(systolic),
+                diastolic: parseInt(diastolic),
+                pulse: parseInt(pulse),
+                datetime: datetime
+            };
+            
+            saveRecord(record);
+            
+            document.getElementById('bloodPressureForm').reset();
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+            
+            loadRecords();
+        });
+
+        function saveRecord(record) {
+            let records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+            records.push(record);
+            records.sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
+            localStorage.setItem('bloodPressureRecords', JSON.stringify(records));
+        }
+
+        function loadRecords() {
+            const records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+            const container = document.getElementById('recordsContainer');
+            
+            container.innerHTML = '';
+            
+            records.forEach(record => {
+                const recordDiv = document.createElement('div');
+                recordDiv.className = 'record';
+                
+                const date = new Date(record.datetime);
+                const formattedDate = date.toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                recordDiv.innerHTML = `
+                    <div class="record-date">${formattedDate}</div>
+                    <div class="record-values">
+                        <span class="bp-value">${record.systolic}/${record.diastolic} mmHg</span>
+                        <span class="pulse-value">脈拍 ${record.pulse}</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteRecord(${record.id})">削除</button>
+                `;
+                
+                container.appendChild(recordDiv);
+            });
+        }
+
+        function deleteRecord(id) {
+            if (confirm('この記録を削除しますか？')) {
+                let records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+                records = records.filter(record => record.id !== id);
+                localStorage.setItem('bloodPressureRecords', JSON.stringify(records));
+                loadRecords();
+            }
+        }
+
+        function exportData() {
+            const records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+            
+            let csv = '日時,最高血圧,最低血圧,脈拍\n';
+            records.forEach(record => {
+                const date = new Date(record.datetime);
+                const formattedDate = date.toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                csv += `"${formattedDate}",${record.systolic},${record.diastolic},${record.pulse}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `血圧記録_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
