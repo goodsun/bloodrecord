@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>bloodRecord</title>
+    <link rel="icon" type="image/png" href="image/icon.png">
+    <link rel="apple-touch-icon" href="image/icon.png">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -33,7 +35,6 @@
             color: #666;
             font-weight: bold;
             font-size: 14px;
-            min-width: 80px;
         }
         input {
             flex: 1;
@@ -74,18 +75,16 @@
         }
         .record-date {
             color: #666;
-            font-size: 12px;
-            min-width: 110px;
+            font-size: 18px;
         }
         .record-values {
             display: flex;
-            gap: 15px;
-            font-size: 14px;
+            gap: 5px;
+            font-size: 18px;
             flex: 1;
         }
         .bp-value {
             color: #2196F3;
-            font-weight: bold;
         }
         .pulse-value {
             color: #FF5722;
@@ -126,18 +125,14 @@
         
         <form id="bloodPressureForm">
             <div class="input-group">
-                <label for="systolic">最高血圧</label>
-                <input type="number" id="systolic" required min="50" max="250" placeholder="mmHg">
-            </div>
-            
-            <div class="input-group">
-                <label for="diastolic">最低血圧</label>
-                <input type="number" id="diastolic" required min="30" max="150" placeholder="mmHg">
-            </div>
-            
-            <div class="input-group">
-                <label for="pulse">脈拍</label>
-                <input type="number" id="pulse" required min="30" max="200" placeholder="回/分">
+                <label for="systolic">血圧</label>
+                <div style="display: flex; gap: 5px; align-items: center; flex: 1;">
+                    <select id="systolic" required style="width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;"></select>
+                    <span>/</span>
+                    <select id="diastolic" required style="width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;"></select>
+                    <span>　脈拍:</span>
+                    <select id="pulse" required style="width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px;"></select>
+                </div>
             </div>
             
             <div class="input-group">
@@ -149,7 +144,7 @@
                 <button type="button" class="export-btn" onclick="exportData()" style="flex: 1;">エクスポート</button>
                 <button type="button" class="import-btn" onclick="document.getElementById('csvInput').click()" style="flex: 1;">インポート</button>
                 <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="importCSV(event)">
-                <button type="submit" style="flex: 1;">記録する</button>
+                <button type="submit" style="flex: 1;">記録</button>
             </div>
         </form>
         
@@ -165,6 +160,8 @@
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('datetime').value = now.toISOString().slice(0, 16);
             
+            createSelectOptions();
+            setDefaultValues();
             loadRecords();
         });
 
@@ -191,8 +188,51 @@
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('datetime').value = now.toISOString().slice(0, 16);
             
+            setDefaultValues();
             loadRecords();
         });
+
+        function createSelectOptions() {
+            const systolicSelect = document.getElementById('systolic');
+            const diastolicSelect = document.getElementById('diastolic');
+            const pulseSelect = document.getElementById('pulse');
+            
+            for (let i = 80; i <= 200; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                systolicSelect.appendChild(option);
+            }
+            
+            for (let i = 40; i <= 120; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                diastolicSelect.appendChild(option);
+            }
+            
+            for (let i = 40; i <= 120; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                pulseSelect.appendChild(option);
+            }
+        }
+
+        function setDefaultValues() {
+            const records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+            
+            if (records.length > 0) {
+                const lastRecord = records[0];
+                document.getElementById('systolic').value = lastRecord.systolic;
+                document.getElementById('diastolic').value = lastRecord.diastolic;
+                document.getElementById('pulse').value = lastRecord.pulse;
+            } else {
+                document.getElementById('systolic').value = 120;
+                document.getElementById('diastolic').value = 80;
+                document.getElementById('pulse').value = 70;
+            }
+        }
 
         function saveRecord(record) {
             let records = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
@@ -223,8 +263,8 @@
                 recordDiv.innerHTML = `
                     <div class="record-date">${formattedDate}</div>
                     <div class="record-values">
-                        <span class="bp-value">${record.systolic}/${record.diastolic} mmHg</span>
-                        <span class="pulse-value">脈拍 ${record.pulse}</span>
+                        <span class="bp-value">${record.systolic}/${record.diastolic}</span>
+                        <span class="pulse-value">${record.pulse}</span>
                     </div>
                     <button class="delete-btn" onclick="deleteRecord(${record.id})">削除</button>
                 `;
