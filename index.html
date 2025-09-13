@@ -118,19 +118,35 @@
             background-color: #e68900;
         }
         .voice-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            border-radius: 10%;
             background-color: #9C27B0;
+            color: white;
+            border: none;
+						padding:5px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .voice-btn:hover {
             background-color: #7B1FA2;
+            transform: scale(1.1);
+            transition: all 0.2s;
         }
         .voice-btn.recording {
             background-color: #f44336;
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
@@ -159,7 +175,6 @@
                 <button type="button" class="export-btn" onclick="exportData()" style="flex: 1;">エクスポート</button>
                 <button type="button" class="import-btn" onclick="document.getElementById('csvInput').click()" style="flex: 1;">インポート</button>
                 <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="importCSV(event)">
-                <button type="button" id="voiceBtn" class="voice-btn" onclick="startVoiceInput()" style="flex: 1;">🎤音声入力</button>
                 <button type="submit" style="flex: 1;">記録</button>
             </div>
         </form>
@@ -169,6 +184,8 @@
             <div id="recordsContainer"></div>
         </div>
     </div>
+
+    <button type="button" id="voiceBtn" class="voice-btn" onclick="startVoiceInput()">音声入力</button>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -436,7 +453,7 @@
             voiceData = {};
             
             const voiceBtn = document.getElementById('voiceBtn');
-            voiceBtn.textContent = '🎤録音中...';
+            voiceBtn.textContent = '🎤';
             voiceBtn.classList.add('recording');
             voiceBtn.disabled = true;
 
@@ -446,7 +463,7 @@
         }
 
         function askForSystolic() {
-            speak('最高血圧を教えてください', () => {
+            speak('最高血圧は?', () => {
                 setTimeout(() => {
                     recognition.onresult = function(event) {
                         const result = event.results[0][0].transcript;
@@ -454,9 +471,10 @@
                         const number = extractNumber(result);
                         if (number && number >= 80 && number <= 200) {
                             voiceData.systolic = number;
+                            document.getElementById('systolic').value = number;
                             askForDiastolic();
                         } else {
-                            speak('もう一度、最高血圧を教えてください', () => {
+                            speak('もう一度最高血圧は', () => {
                                 setTimeout(() => {
                                     recognition.start();
                                 }, 500);
@@ -469,7 +487,7 @@
         }
 
         function askForDiastolic() {
-            speak('最低血圧を教えてください', () => {
+            speak('最低血圧は?', () => {
                 setTimeout(() => {
                     recognition.onresult = function(event) {
                         const result = event.results[0][0].transcript;
@@ -477,9 +495,10 @@
                         const number = extractNumber(result);
                         if (number && number >= 40 && number <= 120) {
                             voiceData.diastolic = number;
+                            document.getElementById('diastolic').value = number;
                             askForPulse();
                         } else {
-                            speak('もう一度、最低血圧を教えてください', () => {
+                            speak('もう一度最低血圧は', () => {
                                 setTimeout(() => {
                                     recognition.start();
                                 }, 500);
@@ -492,7 +511,7 @@
         }
 
         function askForPulse() {
-            speak('脈拍を教えてください', () => {
+            speak('脈拍は？', () => {
                 setTimeout(() => {
                     recognition.onresult = function(event) {
                         const result = event.results[0][0].transcript;
@@ -500,9 +519,10 @@
                         const number = extractNumber(result);
                         if (number && number >= 40 && number <= 120) {
                             voiceData.pulse = number;
+                            document.getElementById('pulse').value = number;
                             confirmData();
                         } else {
-                            speak('もう一度、脈拍を教えてください', () => {
+                            speak('もう一度脈拍は', () => {
                                 setTimeout(() => {
                                     recognition.start();
                                 }, 500);
@@ -515,7 +535,7 @@
         }
 
         function confirmData() {
-            const message = `最高血圧${voiceData.systolic}、最低血圧${voiceData.diastolic}、脈拍${voiceData.pulse}で記録してよろしいですか？`;
+            const message = `最高${voiceData.systolic}、最低${voiceData.diastolic}、脈拍${voiceData.pulse}を記録しますか？`;
             speak(message, () => {
                 setTimeout(() => {
                     recognition.onresult = function(event) {
@@ -563,13 +583,14 @@
         function speak(text, callback) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'ja-JP';
+            utterance.rate = 1.3;
             utterance.onend = callback || function() {};
             speechSynthesis.speak(utterance);
         }
 
         function resetVoiceInput() {
             const voiceBtn = document.getElementById('voiceBtn');
-            voiceBtn.textContent = '🎤音声入力';
+            voiceBtn.textContent = '🎤';
             voiceBtn.classList.remove('recording');
             voiceBtn.disabled = false;
         }
