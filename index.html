@@ -117,6 +117,21 @@
         .import-btn:hover {
             background-color: #e68900;
         }
+        .voice-btn {
+            background-color: #9C27B0;
+        }
+        .voice-btn:hover {
+            background-color: #7B1FA2;
+        }
+        .voice-btn.recording {
+            background-color: #f44336;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -144,6 +159,7 @@
                 <button type="button" class="export-btn" onclick="exportData()" style="flex: 1;">エクスポート</button>
                 <button type="button" class="import-btn" onclick="document.getElementById('csvInput').click()" style="flex: 1;">インポート</button>
                 <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="importCSV(event)">
+                <button type="button" id="voiceBtn" class="voice-btn" onclick="startVoiceInput()" style="flex: 1;">🎤音声入力</button>
                 <button type="submit" style="flex: 1;">記録</button>
             </div>
         </form>
@@ -388,6 +404,174 @@
             };
             
             reader.readAsText(file);
+        }
+
+        let recognition;
+        let currentStep = 0;
+        let voiceData = {};
+
+        function startVoiceInput() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('お使いのブラウザは音声認識に対応していません。');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onerror = function(event) {
+                console.error('音声認識エラー:', event.error);
+                speak('音声認識でエラーが発生しました。もう一度お試しください。');
+                resetVoiceInput();
+            };
+
+            recognition.onend = function() {
+                console.log('音声認識終了');
+            };
+
+            currentStep = 0;
+            voiceData = {};
+            
+            const voiceBtn = document.getElementById('voiceBtn');
+            voiceBtn.textContent = '🎤録音中...';
+            voiceBtn.classList.add('recording');
+            voiceBtn.disabled = true;
+
+            setTimeout(() => {
+                askForSystolic();
+            }, 500);
+        }
+
+        function askForSystolic() {
+            speak('最高血圧を教えてください', () => {
+                setTimeout(() => {
+                    recognition.onresult = function(event) {
+                        const result = event.results[0][0].transcript;
+                        console.log('認識結果:', result);
+                        const number = extractNumber(result);
+                        if (number && number >= 80 && number <= 200) {
+                            voiceData.systolic = number;
+                            askForDiastolic();
+                        } else {
+                            speak('もう一度、最高血圧を教えてください', () => {
+                                setTimeout(() => {
+                                    recognition.start();
+                                }, 500);
+                            });
+                        }
+                    };
+                    recognition.start();
+                }, 1000);
+            });
+        }
+
+        function askForDiastolic() {
+            speak('最低血圧を教えてください', () => {
+                setTimeout(() => {
+                    recognition.onresult = function(event) {
+                        const result = event.results[0][0].transcript;
+                        console.log('認識結果:', result);
+                        const number = extractNumber(result);
+                        if (number && number >= 40 && number <= 120) {
+                            voiceData.diastolic = number;
+                            askForPulse();
+                        } else {
+                            speak('もう一度、最低血圧を教えてください', () => {
+                                setTimeout(() => {
+                                    recognition.start();
+                                }, 500);
+                            });
+                        }
+                    };
+                    recognition.start();
+                }, 1000);
+            });
+        }
+
+        function askForPulse() {
+            speak('脈拍を教えてください', () => {
+                setTimeout(() => {
+                    recognition.onresult = function(event) {
+                        const result = event.results[0][0].transcript;
+                        console.log('認識結果:', result);
+                        const number = extractNumber(result);
+                        if (number && number >= 40 && number <= 120) {
+                            voiceData.pulse = number;
+                            confirmData();
+                        } else {
+                            speak('もう一度、脈拍を教えてください', () => {
+                                setTimeout(() => {
+                                    recognition.start();
+                                }, 500);
+                            });
+                        }
+                    };
+                    recognition.start();
+                }, 1000);
+            });
+        }
+
+        function confirmData() {
+            const message = `最高血圧${voiceData.systolic}、最低血圧${voiceData.diastolic}、脈拍${voiceData.pulse}で記録してよろしいですか？`;
+            speak(message, () => {
+                setTimeout(() => {
+                    recognition.onresult = function(event) {
+                        const result = event.results[0][0].transcript;
+                        console.log('認識結果:', result);
+                        if (result.includes('はい') || result.includes('オーケー') || result.includes('OK')) {
+                            saveVoiceData();
+                            speak('記録しました');
+                        } else {
+                            speak('キャンセルしました');
+                        }
+                        resetVoiceInput();
+                    };
+                    recognition.start();
+                }, 1000);
+            });
+        }
+
+        function saveVoiceData() {
+            document.getElementById('systolic').value = voiceData.systolic;
+            document.getElementById('diastolic').value = voiceData.diastolic;
+            document.getElementById('pulse').value = voiceData.pulse;
+            
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+
+            const record = {
+                id: Date.now(),
+                systolic: voiceData.systolic,
+                diastolic: voiceData.diastolic,
+                pulse: voiceData.pulse,
+                datetime: now.toISOString().slice(0, 16)
+            };
+
+            saveRecord(record);
+            loadRecords();
+        }
+
+        function extractNumber(text) {
+            const match = text.match(/\d+/);
+            return match ? parseInt(match[0]) : null;
+        }
+
+        function speak(text, callback) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ja-JP';
+            utterance.onend = callback || function() {};
+            speechSynthesis.speak(utterance);
+        }
+
+        function resetVoiceInput() {
+            const voiceBtn = document.getElementById('voiceBtn');
+            voiceBtn.textContent = '🎤音声入力';
+            voiceBtn.classList.remove('recording');
+            voiceBtn.disabled = false;
         }
     </script>
 </body>
