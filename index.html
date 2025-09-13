@@ -112,6 +112,12 @@
         .export-btn:hover {
             background-color: #0b7dda;
         }
+        .import-btn {
+            background-color: #FF9800;
+        }
+        .import-btn:hover {
+            background-color: #e68900;
+        }
     </style>
 </head>
 <body>
@@ -141,6 +147,8 @@
             
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button type="button" class="export-btn" onclick="exportData()" style="flex: 1;">エクスポート</button>
+                <button type="button" class="import-btn" onclick="document.getElementById('csvInput').click()" style="flex: 1;">インポート</button>
+                <input type="file" id="csvInput" accept=".csv" style="display: none;" onchange="importCSV(event)">
                 <button type="submit" style="flex: 1;">記録する</button>
             </div>
         </form>
@@ -255,6 +263,91 @@
             link.href = URL.createObjectURL(blob);
             link.download = `血圧記録_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
+        }
+
+        function importCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const lines = content.split('\n');
+                
+                const importedRecords = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g);
+                    if (values && values.length >= 4) {
+                        const dateStr = values[0].replace(/"/g, '');
+                        const systolic = parseInt(values[1]);
+                        const diastolic = parseInt(values[2]);
+                        const pulse = parseInt(values[3]);
+                        
+                        const dateParts = dateStr.match(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+                        if (dateParts && !isNaN(systolic) && !isNaN(diastolic) && !isNaN(pulse)) {
+                            const datetime = new Date(
+                                parseInt(dateParts[1]),
+                                parseInt(dateParts[2]) - 1,
+                                parseInt(dateParts[3]),
+                                parseInt(dateParts[4]),
+                                parseInt(dateParts[5])
+                            );
+                            
+                            datetime.setMinutes(datetime.getMinutes() - datetime.getTimezoneOffset());
+                            
+                            importedRecords.push({
+                                id: Date.now() + Math.random(),
+                                systolic: systolic,
+                                diastolic: diastolic,
+                                pulse: pulse,
+                                datetime: datetime.toISOString().slice(0, 16)
+                            });
+                        }
+                    }
+                }
+                
+                if (importedRecords.length > 0) {
+                    let existingRecords = JSON.parse(localStorage.getItem('bloodPressureRecords') || '[]');
+                    let updatedCount = 0;
+                    let addedCount = 0;
+                    
+                    importedRecords.forEach(importedRecord => {
+                        const existingIndex = existingRecords.findIndex(record => 
+                            record.datetime === importedRecord.datetime
+                        );
+                        
+                        if (existingIndex !== -1) {
+                            existingRecords[existingIndex] = importedRecord;
+                            updatedCount++;
+                        } else {
+                            existingRecords.push(importedRecord);
+                            addedCount++;
+                        }
+                    });
+                    
+                    existingRecords.sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
+                    localStorage.setItem('bloodPressureRecords', JSON.stringify(existingRecords));
+                    loadRecords();
+                    
+                    let message = '';
+                    if (addedCount > 0) message += `${addedCount}件を追加`;
+                    if (updatedCount > 0) {
+                        if (message) message += '、';
+                        message += `${updatedCount}件を更新`;
+                    }
+                    message += 'しました。';
+                    alert(message);
+                } else {
+                    alert('有効なデータが見つかりませんでした。CSVフォーマットを確認してください。');
+                }
+                
+                event.target.value = '';
+            };
+            
+            reader.readAsText(file);
         }
     </script>
 </body>
